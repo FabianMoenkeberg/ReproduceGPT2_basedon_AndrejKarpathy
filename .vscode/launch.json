@@ -1,0 +1,52 @@
+{
+    "configurations": [
+        {
+            "name": "Python: Run current File inside Docker",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "Docker: Python - General",
+            "type": "docker",
+            "request": "launch",
+            "preLaunchTask": "docker-run: rerun",
+            "python": {
+                "pathMappings": [
+                    {
+                        "localRoot": "/mnt/c/Users/fmo/sourcePrivate/ReproduceGPT2_basedon_AndrejKarpathy",
+                        "remoteRoot": "/app"
+                    },
+                    {
+                        "localRoot": "/mnt/d/data",
+                        "remoteRoot": "/data"
+                    }
+                ],
+                "args": ["--gpus=all"],
+                "projectType": "general"
+            }
+        },
+        {
+            "name": "Docker: Python - Attach Debug",
+            "type": "debugpy",
+            "request": "attach",
+            "preLaunchTask": "docker-run: prebuild",
+            "connect":{
+                "host": "0.0.0.0",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "/mnt/c/Users/fmo/sourcePrivate/ReproduceGPT2_basedon_AndrejKarpathy",
+                    "remoteRoot": "/app"
+                },
+                {
+                    "localRoot": "/mnt/d/data",
+                    "remoteRoot": "/data"
+                }
+            ]
+        }
+    ]
+}

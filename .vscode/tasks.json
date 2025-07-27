@@ -1,0 +1,88 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "docker-build",
+			"label": "docker-build",
+			"platform": "python",
+			"dockerBuild": {
+				"tag": "gpt2_image",
+				"dockerfile": "/mnt/c/Users/fmo/sourcePrivate/ReproduceGPT2_basedon_AndrejKarpathy/docker",
+				"context": "${workspaceFolder}",
+				"pull": true
+			}
+		},
+		{
+			"type": "shell",
+			"label": "docker-buildx",
+			"command": "docker",
+			"args": [
+				"buildx",
+				"build",
+				"-t",
+				"gpt2_image",
+				"."
+			],
+			"group": "build"
+		},
+		{
+			"type": "docker-run",
+			"label": "docker-run: debug",
+			"dependsOn": [
+				"docker-buildx"
+			],
+			"dockerRun": {
+				"env": {
+					"NVIDIA_VISIBLE_DEVICES": "all"
+				},
+				"containerName": "gpt2_image"
+				// "command": "--gpus all"
+			},
+			// "node": {
+			// 	"enableDebugging": true
+			// },
+			"python": {
+				"file": "train_gpt2.py"
+			}
+		},
+		{
+			"label": "docker-run: prebuild",
+			"type": "shell",
+			"command": "docker run --gpus all -p 5678:5678 -v /mnt/c/Users/fmo/sourcePrivate/ReproduceGPT2_basedon_AndrejKarpathy:/app -v /mnt/d/data/eyeSegmentation:/data gpt2_image",
+			"problemMatcher": [],
+			"isBackground": true,
+			// "dependsOn": ["Build Docker Image"],
+			"group": {
+			  "kind": "none",
+			  "isDefault": true
+			}
+		},
+		{
+			"type": "docker-run",
+			"label": "docker-run: rerun",
+			"dependsOn": [
+				// "docker-buildx"
+			],
+			"dockerRun": {
+                "customOptions": "--gpus all",
+				"containerName": "gpt2_image",
+				// "env": {
+				// 	"NVIDIA_VISIBLE_DEVICES": "all"
+				// },
+				"volumes": [
+					{
+					"localPath": "/mnt/c/Users/fmo/sourcePrivate/ReproduceGPT2_basedon_AndrejKarpathy",
+					"containerPath": "/app"
+					},
+					{
+                    "localPath": "/mnt/d/data",
+                    "containerPath": "/data"
+                    }
+				]
+			},
+			"python": {
+				"file": "train_gpt2.py"
+			}
+		}
+	]
+}
