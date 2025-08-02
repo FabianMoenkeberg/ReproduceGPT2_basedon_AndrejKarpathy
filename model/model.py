@@ -29,7 +29,7 @@ class GPT(nn.Module):
         )
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
-        # weight sharing scheme
+        # weight sharing scheme -> the output layer is the same as the input embedding layer (see paper " Ofir Press and Lior Wolf. Using the output embedding to improve language models")
         self.transformer.wte.weight = self.lm_head.weight
 
         self.apply(self._init_weights)
@@ -76,7 +76,7 @@ class GPT(nn.Module):
         return optimizer
 
     def forward(self, idx, targets=None):
-        # idx is of shape (B, T)
+        # idx is of shape (B, T) -> Maximum idx-length is "time"-length
         B, T = idx.size()
 
         assert (
@@ -209,6 +209,8 @@ class GPT(nn.Module):
         sd_keys_hf = sd_hf.keys()
         sd_keys_hf = [k for k in sd_keys_hf if not k.endswith(".attn.masked_bias")]
         sd_keys_hf = [k for k in sd_keys_hf if not k.endswith(".attn.bias")]
+        # Note, some weights need to be transposed, since we take them from the tensorflow model
+        # and the pytorch model expects them transposed.
         transposed = [
             "attn.c_attn.weight",
             "attn.c_proj.weight",
@@ -268,12 +270,12 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)  # (B, nh, T, hs)
         # this is the standard attention mechanism
-        # att = (q @ k.transpose(-2, -1)) * (1.0 / (C // self.n_head) ** 0.5)  # (B, nh, T, T)
-        # att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf')) -> # this is the causal mask, it prevents attention to future tokens
-        # att = F.softmax(att, dim=-1)
-        # y = att @ v  # (B, nh, T, hs)
+        att = (q @ k.transpose(-2, -1)) * (1.0 / (C // self.n_head) ** 0.5)  # (B, nh, T, T)
+        att = att.masked_fill(self.bias[:,:,:T,:T] == 0, float('-inf')) #-> # this is the causal mask, it prevents attention to future tokens
+        att = F.softmax(att, dim=-1)
+        y = att @ v  # (B, nh, T, hs)
         # this uses flash-attention: way faster (especially on GPU)
-        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        # y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
 
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.c_proj(y)
@@ -285,7 +287,7 @@ class MLP(nn.Module):
         super().__init__()
         self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd)
         self.gelu = nn.GELU(approximate="tanh")  # use tanh approximation for GELU, not the exact one. Note that with the new implementation of erf() needed in GELU, the code is as fast as with the approximated one. -> Use the exact one.
-        
+
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
 
     def forward(self, x):
@@ -299,7 +301,7 @@ class Block(nn.Module):
     """A single Transformer block.
     It consists of a self-attention layer and an MLP, each layer precedes a layer norm.
     Note this is a difference to the original model from "Attention is All You Need" paper,
-    where the layer norm is applied after the self-attention and MLP layers. 
+    where the layer norm is applied after the self-attention and MLP layers.
     -> This is the "pre-LN" variant and more modern/stable.
     Additionally, the residual connections are now not merged into the normalization.
     -> This is a clean residual pathway and this is better for training stability and convergence.

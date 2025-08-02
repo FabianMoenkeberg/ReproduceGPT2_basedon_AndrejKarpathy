@@ -166,3 +166,6 @@ Note: It is important to use `buildx` not `build`.
 * Start "Terminal -> Run Task..." the task "docker-run: prebuild"
 * In "Run and Debug" run "Docker: Python - Attach Debug"
 * debug it ...*
+
+# Video progress
+up to 1:12:34
