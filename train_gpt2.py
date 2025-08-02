@@ -40,15 +40,15 @@ class DataLoaderLite:
         return
 
         # get the shard filenames
-        data_root = "edu_fineweb10B"
-        shards = os.listdir(data_root)
-        shards = [s for s in shards if split in s]
-        shards = sorted(shards)
-        shards = [os.path.join(data_root, s) for s in shards]
-        self.shards = shards
-        assert len(shards) > 0, f"no shards found for split {split}"
-        if master_process:
-            print(f"found {len(shards)} shards for split {split}")
+        # data_root = "edu_fineweb10B"
+        # shards = os.listdir(data_root)
+        # shards = [s for s in shards if split in s]
+        # shards = sorted(shards)
+        # shards = [os.path.join(data_root, s) for s in shards]
+        # self.shards = shards
+        # assert len(shards) > 0, f"no shards found for split {split}"
+        # if master_process:
+        #     print(f"found {len(shards)} shards for split {split}")
         self.reset()
 
     def reset(self):
@@ -203,9 +203,10 @@ for step in range(max_steps):
     optimizer.step()
     torch.cuda.synchronize() # wait for the GPU to finish work
     t1 = time.time()
-    dt = (t1 - t0)*1000 # time difference in seconds
+    dt = (t1 - t0) # time difference in seconds
+    tokens_processed = train_loader.B * train_loader.T * grad_accum_steps
+    tokens_per_sec = tokens_processed / dt
     # if i % 10 == 0:
-    print(f"step {step}, loss: {loss.item()}, lr {lr:.4f}, norm: {norm:0.4f}, dt: {dt:.2f}ms, tokens/sec: {train_loader.B * train_loader.T / (dt / 1000):.2f}")
-
+    print(f"step {step}, loss: {loss_accum.item()}, lr {lr:.4f}, norm: {norm:0.4f}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec*1000:.2f}")
 
 ## END Test training loop
