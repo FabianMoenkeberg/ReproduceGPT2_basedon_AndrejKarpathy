@@ -35,6 +35,9 @@ class GPT(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
+        # Note: all other layers that need initialization are nn.LayerNorm, but the default initialization is fine.
+        # -> Scale: 1, Offset: 0
+        # Note: 0.02 is in the size ofm around 1/sqrt(n_embd) -> this is the standard initialization for transformers
         if isinstance(module, nn.Linear):
             std = 0.02
             # in the original paper they scale the weights in the last projection
@@ -245,7 +248,6 @@ class CausalSelfAttention(nn.Module):
         self.c_attn = nn.Linear(config.n_embd, config.n_embd * 3)
         # output projection
         self.c_proj = nn.Linear(config.n_embd, config.n_embd)
-
         self.c_proj.dummy_flag = 1
         self.n_head = config.n_head
         self.n_embd = config.n_embd
@@ -289,6 +291,8 @@ class MLP(nn.Module):
         self.gelu = nn.GELU(approximate="tanh")  # use tanh approximation for GELU, not the exact one. Note that with the new implementation of erf() needed in GELU, the code is as fast as with the approximated one. -> Use the exact one.
 
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
+        self.c_proj.dummy_flag = 1
+
 
     def forward(self, x):
         x = self.c_fc(x)
