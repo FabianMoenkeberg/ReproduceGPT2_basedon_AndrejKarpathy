@@ -142,25 +142,55 @@ if torch.cuda.is_available():
 enc = tiktoken.get_encoding("gpt2")
 
 ## Test training loop
-train_loader = DataLoaderLite(B=4, T=32, process_rank=ddp_rank, num_processes=ddp_world_size, split="train")
+train_loader = DataLoaderLite(B=2, T=1024//4, process_rank=ddp_rank, num_processes=ddp_world_size, split="train")
 
-model = GPT(GPTConfig())
+torch.set_float32_matmul_precision('high') # set the matmul precision to high, for better performance
+
+model = GPT(GPTConfig(vocab_size=50304))
 model.to(device)
+model = torch.compile(model) # compile the model for better performance
 # logits, loss = model(x.to(device), y.to(device))
 # print(f"loss: {loss.item()}")
 # Note that loss more or less -log(1/|V|) where |V| is the vocabulary size, so it is around 10.8 for GPT-2, |V| = 50257
 # Then the distribution is uniform of the model.
 
+max_lr = 6e-4
+min_lr = max_lr * 0.1
+warmup_steps = 10
+max_steps = 50 # 19,073 steps is ~1 epoch, if data is 10B tokens and batch size 0.5M tokens
+def get_lr(it):
+    # 1) linear warmup for warmup_iters steps
+    if it < warmup_steps:
+        return max_lr * (it+1) / warmup_steps
+    # 2) if it > lr_decay_iters, return min learning rate
+    if it > max_steps:
+        return min_lr
+    # 3) in between, use cosine decay down to min learning rate
+    decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff starts at 1 and goes to 0
+    return min_lr + coeff * (max_lr - min_lr)
+
 # optimize the model
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
-for i in range(50):
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
+for step in range(max_steps):
+    t0 = time.time()
     x, y = train_loader.next_batch()
     x, y = x.to(device), y.to(device)
     optimizer.zero_grad()
-    logits, loss = model(x, y)
+    with torch.autocast(device_type=device_type, dtype=torch.bfloat16):
+        logits, loss = model(x, y)
     loss.backward()
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) # -> prevent exploding gradients for bad batches
+    lr = get_lr(step)
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
     optimizer.step()
+    torch.cuda.synchronize() # wait for the GPU to finish work
+    t1 = time.time()
+    dt = (t1 - t0)*1000 # time difference in seconds
     # if i % 10 == 0:
-    print(f"step {i}, loss: {loss.item()}")
+    print(f"step {step}, loss: {loss.item()}, lr {lr:.4f}, norm: {norm:0.4f}, dt: {dt:.2f}ms, tokens/sec: {train_loader.B * train_loader.T / (dt / 1000):.2f}")
+
 
 ## END Test training loop
