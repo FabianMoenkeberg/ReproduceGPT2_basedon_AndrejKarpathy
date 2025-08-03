@@ -153,7 +153,7 @@ torch.set_float32_matmul_precision('high') # set the matmul precision to high, f
 model = GPT(GPTConfig(vocab_size=50304))
 model.to(device)
 
-use_compile = True # torch.compile interferes with HellaSwag eval and Generation. TODO fix
+use_compile = False # torch.compile interferes with HellaSwag eval and Generation. TODO fix
 if use_compile:
     model = torch.compile(model) # compile the model for better performance
 
