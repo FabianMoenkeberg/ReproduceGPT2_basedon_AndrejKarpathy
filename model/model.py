@@ -50,7 +50,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def configure_optimizers(self, weight_decay=0.1, learning_rate=3e-4, device="cpu"):
+    def configure_optimizers(self, weight_decay=0.1, learning_rate=3e-4, device_type="cpu"):
         # start with all the candidate parameters
         param_dict = {pn: p for pn, p in self.named_parameters()}
         param_dict = {pn: p for pn, p in param_dict.items()}
@@ -69,7 +69,7 @@ class GPT(nn.Module):
             f"[GPT] Number of parameters without weight decay: {num_nodecay_params:,}"
         )
         fused_available = "fused" in inspect.signature(torch.optim.AdamW).parameters
-        use_fused = fused_available and "cuda" in device
+        use_fused = fused_available and "cuda" in device_type
         # this avoids iterating over the parameters if using GPU and if option is
         # available
         print(f"\tUsing fused AdamW: {use_fused}")
